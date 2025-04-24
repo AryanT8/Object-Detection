@@ -1,0 +1,78 @@
+import cv2
+import numpy as np
+import time
+from ultralytics import YOLO
+import matplotlib.pyplot as plt
+
+# Set Matplotlib to interactive mode
+plt.ion()  # Enables real-time updating of the plot
+
+# Load YOLOv8 model
+MODEL_PATH = r"C:\Users\DELL\Desktop\ai project\best (2).pt"  # Ensure correct model path
+ 
+try:
+    model = YOLO(MODEL_PATH)
+    print("YOLO model loaded successfully.")
+except Exception as e:
+    print(f"Error loading YOLO model: {e}")
+    exit()
+
+# Initialize Logitech C270 HD webcam
+cap = cv2.VideoCapture(0)  # Use 0 for the default webcam
+cap.set(3, 1280)  # Set width
+cap.set(4, 720)   # Set height
+
+if not cap.isOpened():
+    print("Error: Could not open webcam.")
+    exit()
+
+# Create Matplotlib figure
+fig, ax = plt.subplots()
+img_display = ax.imshow(np.zeros((720, 1280, 3), dtype=np.uint8))  # Placeholder image
+plt.axis("off")
+
+prev_time = time.time()
+
+try:
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Failed to capture frame.")
+            break
+
+        # Run YOLOv8 detection
+        results = model(frame)
+
+        # Draw detection results
+        for result in results:
+            for box in result.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                confidence = float(box.conf[0])
+                cls = int(box.cls[0])
+                label = f"{model.names[cls]} {confidence:.2f}"
+
+                # Draw bounding box and label
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # Calculate FPS
+        curr_time = time.time()
+        fps = 1 / (curr_time - prev_time)
+        prev_time = curr_time
+
+        # Display FPS on frame
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        # Update Matplotlib plot in real-time
+        img_display.set_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        plt.draw()
+        plt.pause(0.01)
+
+except Exception as e:
+    print(f"Runtime error: {e}")
+
+finally:
+    print("Releasing webcam and closing windows.")
+    cap.release()
+    plt.ioff()
+    plt.show()
